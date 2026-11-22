@@ -32,6 +32,8 @@ En Linux o macOS, usa `python3.12 -m venv .venv`, `source .venv/bin/activate` y 
 
 Swagger UI está en `http://localhost:8000/api/docs/` y el esquema OpenAPI en JSON en `/api/schema/`. Todas las rutas tienen barra final. Las respuestas con estado 204 llevan el cuerpo vacío. Los errores de la API usan `{"error":{"status":400,"details":{}}}`.
 
+En desarrollo, abre `http://localhost:8000/admin/` e inicia sesión con el correo y la contraseña del superusuario. Aplica las migraciones de Django antes de entrar. Puedes desactivar el admin con `ENABLE_DJANGO_ADMIN=False` en `.env`. Producción mantiene el admin deshabilitado.
+
 El usuario personalizado se registra como `accounts.User`. Si ya tienes una base en uso, conserva su historial local de migraciones para aplicar cambios incrementales. El usuario y los modelos que heredan de `BaseModel` usan UUID v4 como clave primaria. La API devuelve los UUID como cadenas.
 
 ## Autenticación
@@ -200,7 +202,7 @@ Las acciones administrativas requieren acceso a la sección y el permiso indicad
 - En cuentas, `is_active=False` bloquea la autenticación. El usuario conserva un manager capaz de consultar cuentas inactivas y se gestiona aparte del borrado lógico de los modelos de negocio.
 - `bulk_create()`, `update()` y `bulk_update()` omiten el `save()` del modelo. Aplica `normalize_uppercase` explícitamente en escrituras masivas y pasa los datos de auditoría que correspondan. El borrado lógico conserva relaciones. Un borrado físico en cascada puede eliminar registros asociados.
 - PostgreSQL proporciona bloqueo de fila para recuperación y rotación concurrentes. El correo se envía tras confirmar la transacción y el tiempo de respuesta puede depender del servidor SMTP.
-- Los perfiles se administran con el comando de sincronización o `python manage.py shell`. Swagger UI usa la vista incluida en drf-spectacular. El correo de recuperación se compone en el servicio y se envía como texto plano. Los formularios y clases de admin son componentes opcionales sin rutas web.
+- Los perfiles se administran con el comando de sincronización o `python manage.py shell`. Swagger UI usa la vista incluida en drf-spectacular. El correo de recuperación se compone en el servicio y se envía como texto plano. El admin de desarrollo usa sesiones de Django. La API sigue usando JWT.
 
 ## Comprobaciones
 

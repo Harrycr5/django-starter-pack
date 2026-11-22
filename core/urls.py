@@ -1,3 +1,4 @@
+from django.apps import apps
 from django.urls import include, path
 from drf_spectacular.renderers import OpenApiJsonRenderer
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
@@ -16,6 +17,12 @@ urlpatterns = [
     path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="docs"),
     path("api/", include(discover_api_patterns())),
 ]
+
+if apps.is_installed("django.contrib.admin"):
+    from apps.accounts.admin import admin_site
+
+    urlpatterns.append(path("admin/", admin_site.urls))
+
 
 handler400 = "apps.common.exceptions.bad_request"
 handler403 = "apps.common.exceptions.forbidden"

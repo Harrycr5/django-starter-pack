@@ -1,7 +1,10 @@
 import pytest
+from django.apps import apps
 from django.contrib.auth.models import Group
 from django.urls import reverse
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken
+
+from apps.accounts.models import User
 
 from conftest import PASSWORD, login, post
 
@@ -59,8 +62,8 @@ def test_rotation_logout_and_password_change(api, user):
 
 
 def test_json_and_cors(api):
-    assert api.get("/admin/").status_code == 404
-    assert api.get("/admin/")["Content-Type"] == "application/json"
+    assert api.get("/api/nonexistent/").status_code == 404
+    assert api.get("/api/nonexistent/")["Content-Type"] == "application/json"
     assert api.get(reverse("accounts:login"), HTTP_ACCEPT="text/plain").status_code == 406
     docs = api.get("/api/docs/", HTTP_ACCEPT="text/html")
     assert docs.status_code == 200
@@ -78,3 +81,26 @@ def test_json_and_cors(api):
         )
         assert response["Access-Control-Allow-Origin"] == origin
         assert "authorization" in response["Access-Control-Allow-Headers"].lower()
+
+
+@pytest.mark.skipif(not apps.is_installed("django.contrib.admin"), reason="Admin de desarrollo deshabilitado")
+def test_development_admin_login_and_accounts(client, user):
+    admin = User.objects.create_superuser(
+        "root@example.com", PASSWORD, username="root",
+        first_name=user.first_name, last_name=user.last_name, birth_date=user.birth_date,
+    )
+    admin_url = reverse("admin:index")
+    login_url = reverse("admin:login")
+    assert client.get(admin_url).status_code == 302
+    response = client.post(login_url, {"username": admin.email, "password": PASSWORD, "next": admin_url})
+    assert response.status_code == 302 and response.url == admin_url
+    assert client.get(admin_url).status_code == 200
+    assert client.get(reverse("admin:accounts_user_add")).status_code == 200
+    assert client.get(reverse("admin:accounts_user_change", args=[user.pk])).status_code == 200
+
+    client.logout()
+    user.is_staff = True
+    user.save(update_fields=["is_staff"])
+    response = client.post(login_url, {"username": user.email, "password": PASSWORD, "next": admin_url})
+    assert response.status_code == 200
+    assert client.get(admin_url).status_code == 302
