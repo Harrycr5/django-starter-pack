@@ -1,4 +1,3 @@
-from django.conf import settings
 from django.contrib.auth.models import Group, Permission
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
@@ -18,6 +17,7 @@ from apps.common.permissions import ModelPermissions, OwnObjectPermission, can_a
 from . import serializers, services
 from .models import User
 from .menu import ADMIN_MENU, MENU
+from .profiles import ADMIN_PROFILE, is_reserved_profile
 from .throttles import LoginThrottle, RecoveryThrottle
 
 
@@ -186,7 +186,7 @@ class UserDirectoryViewSet(mixins.UpdateModelMixin, viewsets.ReadOnlyModelViewSe
         if self.action == "partial_update":
             queryset = queryset.select_for_update()
             if not self.request.user.is_superuser:
-                queryset = queryset.filter(is_superuser=False).exclude(groups__name=settings.ADMIN_PROFILE)
+                queryset = queryset.filter(is_superuser=False).exclude(groups__name=ADMIN_PROFILE)
         return queryset
 
     @transaction.atomic
@@ -201,7 +201,7 @@ class ProfileViewSet(viewsets.ModelViewSet):
     pagination_class = StandardPagination
 
     def require_editable(self, group):
-        if group.name in {settings.ADMIN_PROFILE, *settings.PROFILE_PERMISSIONS}:
+        if is_reserved_profile(group.name):
             raise ValidationError({"name": "Este perfil se administra en la configuración."})
 
     def perform_update(self, serializer):

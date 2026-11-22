@@ -28,7 +28,9 @@ python manage.py createsuperuser
 python manage.py runserver
 ```
 
-En Linux o macOS, usa `python3.12 -m venv .venv`, `source .venv/bin/activate` y `cp .env.example .env`. Las migraciones se generan localmente y Git solo conserva `migrations/__init__.py`. Configura `DATABASE_URL` con una base PostgreSQL existente antes de inicializar el proyecto. Desarrollo muestra el correo en consola, incluidos los códigos de recuperación.
+En Linux o macOS, usa `python3.12 -m venv .venv`, `source .venv/bin/activate` y `cp .env.example .env`. Configura `DATABASE_URL` con una base PostgreSQL existente antes de inicializar el proyecto. Desarrollo muestra el correo en consola, incluidos los códigos de recuperación.
+
+El starter genera sus migraciones iniciales localmente. En un proyecto derivado, quita las reglas de `migrations` de `.gitignore`, genera y versiona las migraciones desde el primer despliegue. En CI y en cada entorno aplica las migraciones versionadas con `migrate` y luego ejecuta `setup_profiles`.
 
 Swagger UI está en `http://localhost:8000/api/docs/` y el esquema OpenAPI en JSON en `/api/schema/`. Todas las rutas tienen barra final. Las respuestas con estado 204 llevan el cuerpo vacío. Los errores de la API usan `{"error":{"status":400,"details":{}}}`.
 
@@ -198,7 +200,9 @@ Las acciones administrativas requieren acceso a la sección y el permiso indicad
 
 - Usa `--settings=core.settings.prod` para comandos de gestión o configura `DJANGO_SETTINGS_MODULE=core.settings.prod` en el entorno del servidor. Define `SECRET_KEY`, `JWT_SIGNING_KEY`, `ALLOWED_HOSTS`, `DATABASE_URL`, los orígenes CORS autorizados y las variables SMTP de `.env.example`. El perfil de producción fuerza HTTPS.
 - Define `CACHE_URL=redis://...` para compartir los límites de frecuencia entre procesos. El caché local sirve para desarrollo. Programa `python manage.py flushexpiredtokens` para retirar tokens vencidos.
-- `setup_profiles` sincroniza exactamente los permisos de los grupos gestionados. Para asignaciones manuales persistentes, usa permisos directos o grupos adicionales. El superusuario recibe sus permisos por Django.
+- Ejecuta `setup_profiles` después de cada `migrate` y cuando cambie `PROFILE_PERMISSIONS`. Usa `python manage.py setup_profiles --dry-run` para revisar los grupos por crear y las altas y bajas de permisos. Para otro alias, usa el mismo `--database` en ambos comandos.
+- Los perfiles declarativos se gestionan desde el código. La sincronización retira los permisos añadidos manualmente a esos grupos. Para asignaciones persistentes, usa permisos directos o grupos personalizados. Los nombres reservados incluyen variantes de mayúsculas, espacios externos y caracteres Unicode equivalentes.
+- `Administrador` es un rol global deliberado. Cada sincronización le concede todos los permisos de modelos instalados, incluidos los de módulos nuevos. Solo un superusuario puede asignarlo desde la API o el panel de Django. Django concede sus propios privilegios a los superusuarios.
 - En cuentas, `is_active=False` bloquea la autenticación. El usuario conserva un manager capaz de consultar cuentas inactivas y se gestiona aparte del borrado lógico de los modelos de negocio.
 - `bulk_create()`, `update()` y `bulk_update()` omiten el `save()` del modelo. Aplica `normalize_uppercase` explícitamente en escrituras masivas y pasa los datos de auditoría que correspondan. El borrado lógico conserva relaciones. Un borrado físico en cascada puede eliminar registros asociados.
 - PostgreSQL proporciona bloqueo de fila para recuperación y rotación concurrentes. El correo se envía tras confirmar la transacción y el tiempo de respuesta puede depender del servidor SMTP.

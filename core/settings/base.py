@@ -4,7 +4,7 @@ from pathlib import Path
 import environ
 from django.core.exceptions import ImproperlyConfigured
 
-from apps.accounts.profiles import ADMIN_PROFILE, PROFILE_PERMISSIONS
+from apps.accounts.profiles import PROFILE_PERMISSIONS
 from apps.common.utils import DATE_INPUT_FORMATS
 
 BASE_DIR = Path(__file__).resolve().parents[2]

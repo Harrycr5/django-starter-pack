@@ -2,7 +2,7 @@ from django.conf import settings
 from django.contrib.auth.models import Group, Permission
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, router, transaction
 from rest_framework import serializers
 from rest_framework_simplejwt.exceptions import InvalidToken
 from rest_framework_simplejwt.settings import api_settings
@@ -14,8 +14,8 @@ from apps.common.serializers import UppercaseSerializerMixin
 
 from . import services
 from .models import User, normalize_email
-from .profiles import ADMIN_PROFILE
-from .signals import assign_default_profile
+from .profile_sync import assign_default_profile
+from .profiles import ADMIN_PROFILE, is_reserved_profile, normalize_profile_name
 
 
 def validate_new_password(password, user):
@@ -55,18 +55,22 @@ class RegisterSerializer(UppercaseSerializerMixin, serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
+        using = router.db_for_write(User)
         try:
-            with transaction.atomic():
+            with transaction.atomic(using=using):
                 pending = settings.REQUIRE_EMAIL_VERIFICATION
-                user = User.objects.create_user(**validated_data, is_active=not pending, verification_pending=pending)
+                user = User.objects.db_manager(using).create_user(
+                    **validated_data, is_active=not pending, verification_pending=pending,
+                )
                 assign_default_profile(user)
                 if pending:
-                    transaction.on_commit(lambda: services.send_verification(user))
+                    transaction.on_commit(lambda: services.send_verification(user), using=using)
                 return user
         except (IntegrityError, DjangoValidationError) as exc:
-            if User.objects.filter(email__iexact=validated_data["email"]).exists():
+            users = User.objects.using(using)
+            if users.filter(email__iexact=validated_data["email"]).exists():
                 raise serializers.ValidationError({"email": "Ya existe una cuenta con este correo."}) from exc
-            if User.objects.filter(username__iexact=validated_data["username"]).exists():
+            if users.filter(username__iexact=validated_data["username"]).exists():
                 raise serializers.ValidationError({"username": "Este usuario ya existe."}) from exc
             raise
 
@@ -172,7 +176,7 @@ class UserDirectorySerializer(serializers.ModelSerializer):
         actor = self.context["request"].user
         if actor.is_superuser:
             return groups
-        if any(group.name == ADMIN_PROFILE for group in groups):
+        if any(normalize_profile_name(group.name) == normalize_profile_name(ADMIN_PROFILE) for group in groups):
             raise serializers.ValidationError("Solo un superusuario puede asignar el perfil Administrador.")
         granted = Permission.objects.filter(group__in=groups).values_list("content_type__app_label", "codename")
         if any(f"{app_label}.{codename}" not in actor.get_all_permissions() for app_label, codename in granted):
@@ -186,7 +190,7 @@ class ProfileSerializer(serializers.ModelSerializer):
         fields = ("id", "name", "permissions")
 
     def validate_name(self, name):
-        if name in {ADMIN_PROFILE, *settings.PROFILE_PERMISSIONS}:
+        if is_reserved_profile(name):
             raise serializers.ValidationError("Este nombre está reservado para un perfil del sistema.")
         return name
 

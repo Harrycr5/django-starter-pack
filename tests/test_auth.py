@@ -14,7 +14,7 @@ pytestmark = pytest.mark.django_db
 
 
 @pytest.mark.parametrize("field", ["email", "username"])
-def test_login_with_either_identifier(api, user, field):
+def test_login_with_either_identifier(api, user, field, system_profiles):
     user.groups.add(Group.objects.get(name="Usuario"))
     identity = {field: getattr(user, field).upper()}
     assert post(api, "login", **identity, password="incorrecta").status_code == 401

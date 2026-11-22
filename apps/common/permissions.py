@@ -1,6 +1,7 @@
-from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from rest_framework.permissions import DjangoModelPermissions
+
+from apps.accounts.profiles import ADMIN_PROFILE
 
 
 class ModelPermissions(DjangoModelPermissions):
@@ -25,7 +26,7 @@ class ModelPermissions(DjangoModelPermissions):
 
 
 def can_access_all_objects(user):
-    return user.is_authenticated and (user.is_superuser or user.groups.filter(name=settings.ADMIN_PROFILE).exists())
+    return user.is_authenticated and (user.is_superuser or user.groups.filter(name=ADMIN_PROFILE).exists())
 
 
 class OwnObjectPermission(ModelPermissions):

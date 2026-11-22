@@ -49,6 +49,7 @@ jobs:
         run: |
           python manage.py makemigrations --noinput
           python manage.py migrate --noinput
+          python manage.py setup_profiles --database=default
 
       - name: Run tests
         run: python -m pytest -q
@@ -56,4 +57,5 @@ jobs:
       - name: Check Django and OpenAPI
         run: |
           python manage.py check
+          python manage.py makemigrations --check --dry-run
           python manage.py spectacular --validate --fail-on-warn --file schema.yml

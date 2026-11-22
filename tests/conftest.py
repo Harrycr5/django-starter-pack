@@ -2,6 +2,7 @@ from datetime import date
 
 import pytest
 from django.core.cache import cache
+from django.core.management import call_command
 from django.urls import reverse
 from rest_framework.test import APIClient
 
@@ -21,6 +22,11 @@ def test_auth_settings(settings):
 @pytest.fixture
 def api():
     return APIClient()
+
+
+@pytest.fixture
+def system_profiles(db):
+    call_command("setup_profiles", verbosity=0)
 
 
 @pytest.fixture

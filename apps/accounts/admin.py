@@ -1,3 +1,4 @@
+from django import forms
 from django.contrib.admin import AdminSite
 from django.contrib.admin.forms import AdminAuthenticationForm
 from django.contrib.auth.admin import GroupAdmin, UserAdmin
@@ -6,6 +7,7 @@ from django.core.exceptions import ValidationError
 
 from .forms import AccountChangeForm, AccountCreationForm
 from .models import User
+from .profiles import is_reserved_profile
 
 
 class AccountAdmin(UserAdmin):
@@ -41,6 +43,33 @@ class DevelopmentAdminSite(AdminSite):
         return super().has_permission(request) and request.user.is_superuser
 
 
+class ProfileAdminForm(forms.ModelForm):
+    class Meta:
+        model = Group
+        fields = ("name", "permissions")
+
+    def clean_name(self):
+        name = self.cleaned_data["name"]
+        if is_reserved_profile(name):
+            raise forms.ValidationError("Este nombre está reservado para un perfil del sistema.")
+        return name
+
+
+class ProfileAdmin(GroupAdmin):
+    form = ProfileAdminForm
+
+    def has_change_permission(self, request, obj=None):
+        return super().has_change_permission(request, obj) and (obj is None or not is_reserved_profile(obj.name))
+
+    def has_delete_permission(self, request, obj=None):
+        return super().has_delete_permission(request, obj) and (obj is None or not is_reserved_profile(obj.name))
+
+    def get_deleted_objects(self, objs, request):
+        deleted, counts, permissions, protected = super().get_deleted_objects(objs, request)
+        protected.extend(str(group) for group in objs if is_reserved_profile(group.name))
+        return deleted, counts, permissions, protected
+
+
 admin_site = DevelopmentAdminSite()
 admin_site.register(User, AccountAdmin)
-admin_site.register(Group, GroupAdmin)
+admin_site.register(Group, ProfileAdmin)

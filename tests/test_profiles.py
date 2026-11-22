@@ -13,7 +13,7 @@ from conftest import PASSWORD, login, post
 pytestmark = pytest.mark.django_db
 
 
-def test_registration_login_permissions_and_menu(api):
+def test_registration_login_permissions_and_menu(api, system_profiles):
     assert Group.objects.filter(name="Usuario").exists()
     assert Group.objects.get(name="Administrador").permissions.count() == Permission.objects.count()
     call_command("setup_profiles")
